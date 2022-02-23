@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import { LibDiamond } from "../libraries/LibDiamond.sol";
 
 /**
- * @title TokenPrice
+ * @title TokenPriceV1
  * @author Jey
  * @dev This contract handles the token prices each day.
  */
