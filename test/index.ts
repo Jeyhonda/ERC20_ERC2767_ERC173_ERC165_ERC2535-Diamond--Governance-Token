@@ -46,7 +46,7 @@ describe("Token Price (Typescript/Diamond Standard/Hardhat) Test\n", async () =>
         for (const address of await diamondLoupeFacet.facetAddresses()) {
           addresses.push(address as never);
         }
-        await expect(addresses.length).to.be.equal(4);
+        expect(addresses.length).to.be.equal(4);
       });
     });
 
@@ -94,11 +94,11 @@ describe("Token Price (Typescript/Diamond Standard/Hardhat) Test\n", async () =>
     });
 
     describe("Handle token price test", async () => {
-      it("Should get avaerage price reverted if there isn't any token price in range", async () => {
+      it("Shouldn't get average price if there isn't any token prices in range", async () => {
         await tokenPriceV1.unpause();
         await expect(
           tokenPriceV1.getAvgTokenPrice(2022, 1, 2022, 2)
-        ).to.be.revertedWith("No token prices in range");
+        ).to.be.revertedWith("no prices set");
       });
 
       it("Should owner set token price", async () => {
@@ -111,32 +111,32 @@ describe("Token Price (Typescript/Diamond Standard/Hardhat) Test\n", async () =>
 
       it("Should general account set token price", async () => {
         // set token price on 2022-02-15
-        await expect(
-          tokenPriceV1.connect(addr1).setPrice(price2, 2022, 2, 15)
+        expect(
+          await tokenPriceV1.connect(addr1).setPrice(price2, 2022, 2, 15)
         ).to.emit(tokenPriceV1, "SetTokenPrice");
       });
 
       it("Should get token price", async () => {
-        await expect(await tokenPriceV1.getPrice(2022, 1, 1)).to.equal(price1);
+        expect(await tokenPriceV1.getPrice(2022, 1, 1)).to.equal(price1);
       });
 
       it("Should calculate average token price", async () => {
         // get average token price from Jan 2022 to Feb 2022
-        await expect(
-          await tokenPriceV1.getAvgTokenPrice(2022, 1, 2022, 2)
-        ).to.equal(price1.add(price2).div(2));
+        expect(await tokenPriceV1.getAvgTokenPrice(2022, 1, 2022, 2)).to.equal(
+          price1.add(price2).div(2)
+        );
       });
 
       it("Should date parameter of setPrice function after 1970-01-01", async () => {
         // set token price on 1960-01-01
         await expect(
           tokenPriceV1.setPrice(price1, 1960, 1, 1)
-        ).to.be.revertedWith("The date should be after 1970-01-01");
+        ).to.be.revertedWith("date should be after 1970-01-01");
       });
 
       it("Shouldn't get token price on unset day", async () => {
         await expect(tokenPriceV1.getPrice(2021, 1, 1)).to.be.revertedWith(
-          "Token price on this day hasn't been set"
+          "price not set on this day"
         );
       });
 
@@ -145,13 +145,37 @@ describe("Token Price (Typescript/Diamond Standard/Hardhat) Test\n", async () =>
         await tokenPriceV1.setPrice(price2, 2022, 2, 15); // 2022-02-15   -   token price 2 ether
         await expect(
           tokenPriceV1.getAvgTokenPrice(2022, 1, 2021, 12)
-        ).to.be.revertedWith("Start date must be earlier than End date");
+        ).to.be.revertedWith("start date later than end");
       });
     });
   });
 
   describe("Token Price Version 2 test", async () => {
-    it("Should upgrade to Version 2 - replace setPrice with onlyOwner function", async () => {
+    it("Shouldn't general account upgrade to Version 2", async () => {
+      const TokenPriceV2 = await ethers.getContractFactory("TokenPriceV2");
+      tokenPriceV2 = await TokenPriceV2.deploy();
+      await tokenPriceV2.deployed();
+
+      const selectors = getSelectors(TokenPriceV2).get([
+        "setPrice(uint, int, int, int)",
+      ]);
+      await expect(
+        diamondCutFacet.connect(addr1).diamondCut(
+          [
+            {
+              facetAddress: tokenPriceV2.address,
+              action: FacetCutAction.Replace,
+              functionSelectors: selectors,
+            },
+          ],
+          ethers.constants.AddressZero,
+          "0x",
+          { gasLimit: 800000 }
+        )
+      ).to.be.revertedWith("LibDiamond: Must be contract owner");
+    });
+
+    it("Should owner upgrade to Version 2 - replace setPrice with onlyOwner function", async () => {
       const TokenPriceV2 = await ethers.getContractFactory("TokenPriceV2");
       tokenPriceV2 = await TokenPriceV2.deploy();
       await tokenPriceV2.deployed();
@@ -179,9 +203,9 @@ describe("Token Price (Typescript/Diamond Standard/Hardhat) Test\n", async () =>
 
     it("Should storage variable values remain", async () => {
       // get average token price from Jan 2022 to Feb 2022
-      await expect(
-        await tokenPriceV1.getAvgTokenPrice(2022, 1, 2022, 2)
-      ).to.equal(price1.add(price2).div(2));
+      expect(await tokenPriceV1.getAvgTokenPrice(2022, 1, 2022, 2)).to.equal(
+        price1.add(price2).div(2)
+      );
     });
 
     it("Shouldn't general account set token price on Version 2", async () => {
@@ -225,36 +249,22 @@ describe("Token Price (Typescript/Diamond Standard/Hardhat) Test\n", async () =>
       }
     });
 
-    it("Should owner set today's token price on Version 3", async () => {
+    it("Should owner set today's token price", async () => {
+      tokenPriceV3 = await ethers.getContractAt("TokenPriceV3", diamondAddress);
+      // Set todays's token price
+      await tokenPriceV3.setPrice(price3);
+    });
+
+    it("Should owner get today's token price", async () => {
+      // Get current date
       const today = new Date();
       const dd = today.getDate();
       const mm = today.getMonth() + 1;
       const yyyy = today.getFullYear();
 
       tokenPriceV3 = await ethers.getContractAt("TokenPriceV3", diamondAddress);
-      await tokenPriceV3.setPrice(price3);
-      await expect(await tokenPriceV1.getPrice(yyyy, mm, dd)).to.equal(price3);
+      // Set todays's token price
+      expect(await tokenPriceV1.getPrice(yyyy, mm, dd)).to.equal(price3);
     });
-    // it("Should storage variable values remain", async () => {
-    //   // get average token price from Jan 2022 to Feb 2022
-    //   await expect(
-    //     await tokenPriceV1.getAvgTokenPrice(2022, 1, 2022, 2)
-    //   ).to.equal(price1.add(price2).div(2));
-    // });
-
-    // it("Shouldn't general account set token price on Version 2", async () => {
-    //   // set token price on 2022-01-01
-    //   await expect(
-    //     tokenPriceV1.connect(addr1).setPrice(price1, 2022, 1, 1)
-    //   ).to.be.revertedWith("LibDiamond: Must be contract owner");
-    // });
-
-    // it("Should owner set token price on Version 2", async () => {
-    //   // set token price on 2021-12-25
-    //   await expect(tokenPriceV1.setPrice(price3, 2021, 12, 25)).to.emit(
-    //     tokenPriceV1,
-    //     "SetTokenPrice"
-    //   );
-    // });
   });
 });

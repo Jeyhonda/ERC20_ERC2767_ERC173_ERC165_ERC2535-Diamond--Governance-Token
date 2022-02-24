@@ -35,7 +35,7 @@ contract TokenPriceV1 is Pausable{
     event SetTokenPrice(int32 _days, uint price);
 
     modifier isValidDate(int year) {
-        require(year >= 1970, "The date should be after 1970-01-01");
+        require(year >= 1970, "date should be after 1970-01-01");
         _;
     }
     function pause() public {
@@ -49,8 +49,7 @@ contract TokenPriceV1 is Pausable{
     }
 
     /// Calculate the count of days from 1970-01-01   
-    function daysFromDate(int year, int month, int day) private pure returns (int32 _days) {
-      require(year >= 1970);
+    function daysFromDate(int year, int month, int day) private pure isValidDate(year) returns (int32 _days) {
       int _year = int(year);
       int _month = int(month);
       int _day = int(day);
@@ -90,7 +89,7 @@ contract TokenPriceV1 is Pausable{
     */
     function getPrice(int _year, int _month, int _day) external whenNotPaused isValidDate(_year) view returns (uint) {
       int32 _days = daysFromDate(_year, _month, _day);
-      require(tokenPrices[_days].isValid, "Token price on this day hasn't been set");
+      require(tokenPrices[_days].isValid, "price not set on this day");
       return tokenPrices[_days].tokenPrice;
     }
 
@@ -115,21 +114,20 @@ contract TokenPriceV1 is Pausable{
         _toDays = daysFromDate(_toYear, _toMonth + 1, 1);
       }
       int32 _fromDays = daysFromDate(_fromYear, _fromMonth, 1);
-
-      require (_fromDays < _toDays, "Start date must be earlier than End date");
+      
+      require (_fromDays < _toDays, "start date later than end");
       uint16 _tokenPriceCount = 0;
       uint _tokenPriceSum = 0;
 
       for (int32 i = _fromDays; i < _toDays; i++) {
-
-        /// collect the prices for which isValid is true
+        /// collect token prices for which isValid = true
         if (tokenPrices[i].isValid) {
           _tokenPriceSum += tokenPrices[i].tokenPrice;
           _tokenPriceCount ++;
         }
       }
 
-      require (_tokenPriceCount > 0, "No token prices in range");
+      require (_tokenPriceCount > 0, "no prices set");
 
       return _tokenPriceSum / _tokenPriceCount;
     }

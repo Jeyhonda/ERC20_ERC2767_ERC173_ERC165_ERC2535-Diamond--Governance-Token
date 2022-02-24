@@ -35,14 +35,14 @@ contract TokenPriceV2 is Pausable{
     
     event SetTokenPrice(int32 _days, uint price);
 
+    /// check the date is after 1970-01-01
     modifier isValidDate(int year) {
-        require(year >= 1970, "The date should be after 1970-01-01");
+        require(year >= 1970, "date should be after 1970-01-01");
         _;
     }
 
     /// Calculate the count of days from 1970-01-01   
-    function daysFromDate(int year, int month, int day) private pure returns (int32 _days) {
-      require(year >= 1970);
+    function daysFromDate(int year, int month, int day) private pure isValidDate(year) returns (int32 _days) {
       int _year = int(year);
       int _month = int(month);
       int _day = int(day);
